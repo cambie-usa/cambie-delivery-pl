@@ -23,28 +23,38 @@
       <span class="sync-dot" id="syncDot"></span>
       <span id="syncLabel">Connecting…</span>
     </div>
-    <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">
-      ＋ Add Invoice
-    </button>
-    <button class="btn btn-dark" onclick="generatePDF()">
-      ↓ Export PDF
-    </button>
+    <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">＋ Add Invoice</button>
+    <button class="btn btn-dark" onclick="generatePDF()">↓ Export PDF</button>
   </div>
 </header>
 
 <input type="file" id="fileInput" accept="application/pdf" multiple>
 
-<!-- TABS -->
 <div class="tab-bar">
   <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
   <button class="tab-btn" onclick="switchTab('customers')">Customers</button>
   <button class="tab-btn" onclick="switchTab('areas')">Delivery Areas</button>
+  <button class="tab-btn" onclick="switchTab('couriers')">Couriers</button>
 </div>
 
 <div class="app">
 
-  <!-- ═══════════════════════════════════════════════ TAB: OVERVIEW -->
+  <!-- ══════════════════════════════════════════════════ TAB: OVERVIEW -->
   <div id="tab-overview" class="tab-panel">
+
+    <!-- Date filter bar -->
+    <div class="filter-bar">
+      <span class="filter-label">Period:</span>
+      <div class="filter-pills">
+        <button class="pill active" onclick="setFilter('all')">All Time</button>
+        <button class="pill" onclick="setFilter('week')">This Week</button>
+        <button class="pill" onclick="setFilter('month')">This Month</button>
+        <button class="pill" onclick="setFilter('lastmonth')">Last Month</button>
+        <button class="pill" onclick="setFilter('quarter')">This Quarter</button>
+        <button class="pill" onclick="setFilter('year')">This Year</button>
+      </div>
+      <span class="filter-count" id="filterCount"></span>
+    </div>
 
     <div class="kpi-grid">
       <div class="kpi-card">
@@ -86,6 +96,7 @@
             <th>Invoice</th>
             <th>Customer</th>
             <th>Date</th>
+            <th>Courier</th>
             <th class="num">Sales</th>
             <th class="num">Gross Profit</th>
             <th class="num">GP %</th>
@@ -96,20 +107,29 @@
           </tr>
         </thead>
         <tbody id="invoicesBody">
-          <tr><td colspan="10"><div class="empty-state"><p>Loading…</p></div></td></tr>
+          <tr><td colspan="11"><div class="empty-state"><p>Loading…</p></div></td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════ TAB: CUSTOMERS -->
+  <!-- ══════════════════════════════════════════════ TAB: CUSTOMERS -->
   <div id="tab-customers" class="tab-panel hidden">
-
+    <div class="filter-bar">
+      <span class="filter-label">Period:</span>
+      <div class="filter-pills">
+        <button class="pill active" onclick="setFilter('all','customers')">All Time</button>
+        <button class="pill" onclick="setFilter('week','customers')">This Week</button>
+        <button class="pill" onclick="setFilter('month','customers')">This Month</button>
+        <button class="pill" onclick="setFilter('lastmonth','customers')">Last Month</button>
+        <button class="pill" onclick="setFilter('quarter','customers')">This Quarter</button>
+        <button class="pill" onclick="setFilter('year','customers')">This Year</button>
+      </div>
+    </div>
     <div class="search-bar">
       <input type="text" id="customerSearch" placeholder="Search customers…" oninput="renderCustomerTab()" class="search-input">
     </div>
 
-    <!-- Customer summary cards (shown when one is selected) -->
     <div id="customerDetail" class="hidden">
       <div class="detail-header">
         <div>
@@ -119,22 +139,15 @@
         <button class="btn btn-ghost btn-sm" onclick="clearCustomerDetail()">← All Customers</button>
       </div>
       <div class="kpi-grid kpi-grid-sm" id="detailKPIs"></div>
-      <div class="section-header">
-        <div class="section-title">Invoice History</div>
-      </div>
+      <div class="section-header"><div class="section-title">Invoice History</div></div>
       <div class="table-wrap">
         <table class="data-table">
           <thead>
             <tr>
-              <th>Invoice</th>
-              <th>Date</th>
-              <th class="num">Sales</th>
-              <th class="num">Gross Profit</th>
-              <th class="num">GP %</th>
-              <th class="num">Delivery</th>
-              <th class="num">Net Profit</th>
-              <th class="num">Net %</th>
-              <th></th>
+              <th>Invoice</th><th>Date</th><th>Courier</th>
+              <th class="num">Sales</th><th class="num">Gross Profit</th>
+              <th class="num">GP %</th><th class="num">Delivery</th>
+              <th class="num">Net Profit</th><th class="num">Net %</th><th></th>
             </tr>
           </thead>
           <tbody id="detailInvoices"></tbody>
@@ -142,21 +155,15 @@
       </div>
     </div>
 
-    <!-- Customer list (shown by default) -->
     <div id="customerList">
       <div class="table-wrap">
         <table class="data-table">
           <thead>
             <tr>
-              <th>Customer</th>
-              <th>Last Delivery</th>
-              <th class="num">Invoices</th>
-              <th class="num">Total Sales</th>
-              <th class="num">Gross Profit</th>
-              <th class="num">GP %</th>
-              <th class="num">Delivery Cost</th>
-              <th class="num">Net Profit</th>
-              <th class="num">Net %</th>
+              <th>Customer</th><th>Last Delivery</th><th class="num">Invoices</th>
+              <th class="num">Total Sales</th><th class="num">Gross Profit</th>
+              <th class="num">GP %</th><th class="num">Delivery Cost</th>
+              <th class="num">Net Profit</th><th class="num">Net %</th>
             </tr>
           </thead>
           <tbody id="customerBody">
@@ -167,35 +174,72 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════ TAB: AREAS -->
+  <!-- ══════════════════════════════════════════════ TAB: AREAS -->
   <div id="tab-areas" class="tab-panel hidden">
-
+    <div class="filter-bar">
+      <span class="filter-label">Period:</span>
+      <div class="filter-pills">
+        <button class="pill active" onclick="setFilter('all','areas')">All Time</button>
+        <button class="pill" onclick="setFilter('week','areas')">This Week</button>
+        <button class="pill" onclick="setFilter('month','areas')">This Month</button>
+        <button class="pill" onclick="setFilter('lastmonth','areas')">Last Month</button>
+        <button class="pill" onclick="setFilter('quarter','areas')">This Quarter</button>
+        <button class="pill" onclick="setFilter('year','areas')">This Year</button>
+      </div>
+    </div>
     <div class="areas-intro">
-      <p>Delivery area performance is derived from the city in each invoice's shipping address. Use this to identify which parts of Dallas are most profitable to service.</p>
+      <p>Delivery area performance grouped by city from each invoice's shipping address. Identify which parts of Dallas are most profitable to service.</p>
     </div>
-
     <div class="kpi-grid" id="areasKPIs" style="margin-bottom:24px"></div>
-
-    <div class="section-header">
-      <div class="section-title">By City / Area</div>
-    </div>
+    <div class="section-header"><div class="section-title">By City / Area</div></div>
     <div class="table-wrap">
       <table class="data-table">
         <thead>
           <tr>
-            <th>City / Area</th>
-            <th class="num">Deliveries</th>
-            <th class="num">Total Sales</th>
-            <th class="num">Gross Profit</th>
-            <th class="num">GP %</th>
-            <th class="num">Delivery Cost</th>
-            <th class="num">Avg Delivery</th>
-            <th class="num">Net Profit</th>
-            <th class="num">Net %</th>
+            <th>City / Area</th><th class="num">Deliveries</th>
+            <th class="num">Total Sales</th><th class="num">Gross Profit</th>
+            <th class="num">GP %</th><th class="num">Delivery Cost</th>
+            <th class="num">Avg Delivery</th><th class="num">Net Profit</th><th class="num">Net %</th>
           </tr>
         </thead>
         <tbody id="areasBody">
           <tr><td colspan="9"><div class="empty-state"><p>Loading…</p></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TAB: COURIERS -->
+  <div id="tab-couriers" class="tab-panel hidden">
+    <div class="filter-bar">
+      <span class="filter-label">Period:</span>
+      <div class="filter-pills">
+        <button class="pill active" onclick="setFilter('all','couriers')">All Time</button>
+        <button class="pill" onclick="setFilter('week','couriers')">This Week</button>
+        <button class="pill" onclick="setFilter('month','couriers')">This Month</button>
+        <button class="pill" onclick="setFilter('lastmonth','couriers')">Last Month</button>
+        <button class="pill" onclick="setFilter('quarter','couriers')">This Quarter</button>
+        <button class="pill" onclick="setFilter('year','couriers')">This Year</button>
+      </div>
+    </div>
+
+    <div class="kpi-grid" id="courierKPIs" style="margin-bottom:24px"></div>
+
+    <div class="courier-cards" id="courierCards"></div>
+
+    <div class="section-header" style="margin-top:28px"><div class="section-title">Deliveries by Courier</div></div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Courier</th><th class="num">Deliveries</th>
+            <th class="num">Total Cost</th><th class="num">Avg per Delivery</th>
+            <th class="num">% of All Spend</th><th class="num">Associated Sales</th>
+            <th class="num">Net Profit on Runs</th><th class="num">Net %</th>
+          </tr>
+        </thead>
+        <tbody id="courierBody">
+          <tr><td colspan="8"><div class="empty-state"><p>Loading…</p></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -219,12 +263,8 @@
       <table class="items-table">
         <thead>
           <tr>
-            <th>Product</th>
-            <th class="num">Qty</th>
-            <th class="num">Unit Price</th>
-            <th class="num">Line Total</th>
-            <th class="num">Margin %</th>
-            <th class="num">Gross Profit</th>
+            <th>Product</th><th class="num">Qty</th><th class="num">Unit Price</th>
+            <th class="num">Line Total</th><th class="num">Margin %</th><th class="num">Gross Profit</th>
           </tr>
         </thead>
         <tbody id="itemsBody"></tbody>
@@ -239,12 +279,20 @@
       </table>
 
       <div class="delivery-section">
-        <label>Courier Delivery Charge</label>
-        <div class="delivery-input-row">
-          <span class="delivery-dollar">$</span>
-          <input type="number" class="delivery-input" id="deliveryInput"
-            min="0" step="0.01" placeholder="0.00" oninput="updateModalTotals()">
-          <span class="delivery-hint">Actual courier charge for this delivery</span>
+        <label>Courier & Delivery Charge</label>
+        <div class="courier-row">
+          <div class="courier-select-wrap">
+            <select id="courierSelect" class="courier-select">
+              <option value="">Select courier…</option>
+              <option value="Dropoff">Dropoff</option>
+              <option value="Xpress Courierz">Xpress Courierz</option>
+            </select>
+          </div>
+          <div class="delivery-input-row">
+            <span class="delivery-dollar">$</span>
+            <input type="number" class="delivery-input" id="deliveryInput"
+              min="0" step="0.01" placeholder="0.00" oninput="updateModalTotals()">
+          </div>
         </div>
       </div>
 
@@ -273,7 +321,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-
 <script src="config.js"></script>
 <script src="app.js"></script>
 <script src="dashboard.js"></script>
