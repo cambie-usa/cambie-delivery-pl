@@ -238,7 +238,7 @@ async function deleteInvoice(invNo) {
   if (!confirm('Remove invoice ' + invNo + '?')) return;
   setSyncStatus('busy', 'Deleting…');
   try {
-    await deleteInvoice(invNo);
+    await dbDeleteInvoice(invNo);
     invoices = invoices.filter(i => i.invNo !== invNo);
     render();
     setSyncStatus('ok', 'Live');
