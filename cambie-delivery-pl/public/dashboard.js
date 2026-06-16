@@ -73,8 +73,24 @@ function extractInvoiceData(text, filename) {
   const invNoMatch = text.match(/INV[-‑](\d+)/i);
   const invNo = invNoMatch ? 'INV-' + invNoMatch[1] : filename.replace('.pdf', '');
 
-  const nameMatch = text.match(/Name:\s*([^\n]+)/i);
-  let customer = nameMatch ? nameMatch[1].trim().replace(/\s+/g, ' ') : 'Unknown';
+  // Customer name: first token(s) after "Name:" before any address detail (digits, comma, or newline)
+  const nameMatch = text.match(/Name:\s*([A-Za-z0-9&'\-\s]+?)(?=\s+\d|\s*,|\n)/i);
+  let customer = nameMatch ? nameMatch[1].trim() : 'Unknown';
+
+  // Shipping address: street, city, state zip from Ship To block
+  // CIN7 format: "Ship To: <Name> <Name> <street> <city> <state> <zip> <country>"
+  // We grab the street line (contains digits + street words) and city/state/zip
+  let address = '';
+  const shipMatch = text.match(/Ship To:\s*([\s\S]+?)(?=Invoice No\.|Customer VAT:|$)/i);
+  if (shipMatch) {
+    const shipBlock = shipMatch[1].replace(/\s+/g, ' ').trim();
+    // Extract street: first sequence with a number followed by words
+    const streetMatch = shipBlock.match(/(\d+\s+[\w\s]+(?:Dr|St|Ave|Blvd|Rd|Ln|Way|Ct|Pl|Pkwy|Hwy)[.,#\s\d]*)/i);
+    // Extract city/state/zip: pattern like "Richardson TX 75081"
+    const cityMatch   = shipBlock.match(/([A-Za-z\s]+,?\s+[A-Z]{2}\s+\d{5})/);
+    if (streetMatch) address += streetMatch[1].trim();
+    if (cityMatch)   address += (address ? ', ' : '') + cityMatch[1].trim();
+  }
 
   const dateMatch = text.match(/Invoice Date\s*([\d\/]+)/i) || text.match(/(\d{2}\/\d{2}\/\d{4})/);
   const date = dateMatch ? dateMatch[1].trim() : new Date().toLocaleDateString();
@@ -105,7 +121,7 @@ function extractInvoiceData(text, filename) {
     items.push({ code: '', description: 'Invoice Total', qty: 1, unitPrice: invoiceTotal, lineTotal: invoiceTotal, margin: '' });
   }
 
-  return { invNo, customer, date, items, invoiceTotal, delivery: 0, grossProfit: 0, netProfit: 0 };
+  return { invNo, customer, address, date, items, invoiceTotal, delivery: 0, grossProfit: 0, netProfit: 0 };
 }
 
 // ── MODAL ─────────────────────────────────────────────────────────
@@ -117,8 +133,9 @@ function openModal(inv) {
 
   document.getElementById('invInfo').innerHTML = `
     <div class="inv-info-row"><div class="lbl">Invoice No.</div><div class="val">${inv.invNo}</div></div>
-    <div class="inv-info-row"><div class="lbl">Customer</div><div class="val">${inv.customer}</div></div>
     <div class="inv-info-row"><div class="lbl">Date</div><div class="val">${inv.date}</div></div>
+    <div class="inv-info-row"><div class="lbl">Customer</div><div class="val">${inv.customer}</div></div>
+    <div class="inv-info-row"><div class="lbl">Delivery Address</div><div class="val" style="font-size:13px">${inv.address || '—'}</div></div>
     <div class="inv-info-row"><div class="lbl">Invoice Total</div><div class="val">${fmt(inv.invoiceTotal)}</div></div>
   `;
 
@@ -525,4 +542,172 @@ function showToast(msg) {
   t.classList.add('show');
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+// ── TAB SWITCHING ─────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.remove('hidden');
+  document.querySelector(`.tab-btn[onclick="switchTab('${name}')"]`).classList.add('active');
+
+  if (name === 'customers') renderCustomerTab();
+  if (name === 'areas')     renderAreasTab();
+}
+
+// ── CUSTOMER TAB ──────────────────────────────────────────────────
+function renderCustomerTab() {
+  const q = (document.getElementById('customerSearch')?.value || '').toLowerCase();
+
+  const map = {};
+  invoices.forEach(inv => {
+    if (!map[inv.customer]) map[inv.customer] = { invoices: [], address: inv.address || '' };
+    map[inv.customer].invoices.push(inv);
+    if (inv.address && !map[inv.customer].address) map[inv.customer].address = inv.address;
+  });
+
+  const rows = Object.entries(map)
+    .filter(([name]) => !q || name.toLowerCase().includes(q))
+    .map(([name, d]) => {
+      const sales    = d.invoices.reduce((s, i) => s + i.invoiceTotal, 0);
+      const gross    = d.invoices.reduce((s, i) => s + (i.grossProfit || 0), 0);
+      const delivery = d.invoices.reduce((s, i) => s + (i.delivery || 0), 0);
+      const net      = d.invoices.reduce((s, i) => s + (i.netProfit || 0), 0);
+      const lastDate = d.invoices.map(i => i.date).sort().reverse()[0];
+      return { name, address: d.address, count: d.invoices.length, sales, gross, delivery, net, lastDate };
+    })
+    .sort((a, b) => b.sales - a.sales);
+
+  const tbody = document.getElementById('customerBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><p>No customers found.</p></div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const gp = r.sales > 0 ? r.gross / r.sales : 0;
+    const np = r.sales > 0 ? r.net   / r.sales : 0;
+    return `<tr class="clickable" onclick="showCustomerDetail('${r.name.replace(/'/g,"\\'")}')">
+      <td><strong>${r.name}</strong>${r.address ? `<div style="font-size:11px;color:var(--ink-muted);margin-top:2px">${r.address}</div>` : ''}</td>
+      <td>${r.lastDate || '—'}</td>
+      <td class="num">${r.count}</td>
+      <td class="num mono">${fmt(r.sales)}</td>
+      <td class="num mono" style="color:var(--profit)">${fmt(r.gross)}</td>
+      <td class="num mono">${pct(gp)}</td>
+      <td class="num mono" style="color:var(--accent)">${fmt(r.delivery)}</td>
+      <td class="num mono" style="color:${r.net >= 0 ? 'var(--profit)' : 'var(--loss)'};font-weight:600">${fmt(r.net)}</td>
+      <td class="num"><span class="badge ${r.net >= 0 ? 'badge-profit' : 'badge-loss'}">${pct(np)}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function showCustomerDetail(name) {
+  const custInvoices = invoices.filter(i => i.name === name || i.customer === name);
+  const address = custInvoices.find(i => i.address)?.address || '';
+
+  const sales    = custInvoices.reduce((s, i) => s + i.invoiceTotal, 0);
+  const gross    = custInvoices.reduce((s, i) => s + (i.grossProfit || 0), 0);
+  const delivery = custInvoices.reduce((s, i) => s + (i.delivery || 0), 0);
+  const net      = custInvoices.reduce((s, i) => s + (i.netProfit || 0), 0);
+  const gpPct    = sales > 0 ? gross / sales : 0;
+  const netPct   = sales > 0 ? net   / sales : 0;
+
+  document.getElementById('detailName').textContent    = name;
+  document.getElementById('detailAddress').textContent = address || '';
+
+  document.getElementById('detailKPIs').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Total Sales</div><div class="kpi-value">${fmt(sales)}</div><div class="kpi-sub">${custInvoices.length} invoices</div></div>
+    <div class="kpi-card"><div class="kpi-label">Gross Profit</div><div class="kpi-value positive">${fmt(gross)}</div><div class="kpi-sub">${pct(gpPct)} margin</div></div>
+    <div class="kpi-card"><div class="kpi-label">Delivery Cost</div><div class="kpi-value">${fmt(delivery)}</div><div class="kpi-sub">${pct(sales > 0 ? delivery/sales : 0)} of sales</div></div>
+    <div class="kpi-card"><div class="kpi-label">Net Profit</div><div class="kpi-value ${net >= 0 ? 'positive' : 'negative'}">${fmt(net)}</div><div class="kpi-sub">${pct(netPct)} margin</div></div>
+  `;
+
+  document.getElementById('detailInvoices').innerHTML = [...custInvoices]
+    .sort((a, b) => b.date > a.date ? 1 : -1)
+    .map(inv => {
+      const gp = inv.invoiceTotal > 0 ? inv.grossProfit / inv.invoiceTotal : 0;
+      const np = inv.invoiceTotal > 0 ? inv.netProfit   / inv.invoiceTotal : 0;
+      return `<tr>
+        <td><strong>${inv.invNo}</strong></td>
+        <td>${inv.date}</td>
+        <td class="num mono">${fmt(inv.invoiceTotal)}</td>
+        <td class="num mono" style="color:var(--profit)">${fmt(inv.grossProfit)}</td>
+        <td class="num mono">${pct(gp)}</td>
+        <td class="num mono" style="color:var(--accent)">${fmt(inv.delivery)}</td>
+        <td class="num mono" style="color:${inv.netProfit >= 0 ? 'var(--profit)' : 'var(--loss)'};font-weight:600">${fmt(inv.netProfit)}</td>
+        <td class="num"><span class="badge ${inv.netProfit >= 0 ? 'badge-profit' : 'badge-loss'}">${pct(np)}</span></td>
+        <td><button class="btn btn-ghost btn-sm" onclick="editInvoice('${inv.invNo}')">Edit</button></td>
+      </tr>`;
+    }).join('');
+
+  document.getElementById('customerList').classList.add('hidden');
+  document.getElementById('customerDetail').classList.remove('hidden');
+}
+
+function clearCustomerDetail() {
+  document.getElementById('customerDetail').classList.add('hidden');
+  document.getElementById('customerList').classList.remove('hidden');
+}
+
+// ── AREAS TAB ─────────────────────────────────────────────────────
+function parseCity(address) {
+  if (!address) return 'Unknown';
+  // Match "City TX 75XXX" pattern
+  const m = address.match(/([A-Za-z\s]+),?\s+TX\s+\d{5}/i);
+  if (m) return m[1].trim();
+  // Fallback: last word-group before state abbreviation
+  const m2 = address.match(/([A-Za-z\s]+)\s+TX/i);
+  if (m2) return m2[1].trim();
+  return 'Unknown';
+}
+
+function renderAreasTab() {
+  const map = {};
+  invoices.forEach(inv => {
+    const city = parseCity(inv.address);
+    if (!map[city]) map[city] = { count: 0, sales: 0, gross: 0, delivery: 0, net: 0 };
+    map[city].count++;
+    map[city].sales    += inv.invoiceTotal;
+    map[city].gross    += inv.grossProfit || 0;
+    map[city].delivery += inv.delivery    || 0;
+    map[city].net      += inv.netProfit   || 0;
+  });
+
+  const rows = Object.entries(map).sort((a, b) => b[1].net - a[1].net);
+
+  // Top-level area KPIs
+  const totalAreas     = rows.length;
+  const profitAreas    = rows.filter(([, d]) => d.net >= 0).length;
+  const bestArea       = rows[0];
+  const highestAvgDel  = [...rows].sort((a, b) => (b[1].delivery/b[1].count) - (a[1].delivery/a[1].count))[0];
+
+  document.getElementById('areasKPIs').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Areas Served</div><div class="kpi-value">${totalAreas}</div><div class="kpi-sub">${profitAreas} profitable</div></div>
+    <div class="kpi-card"><div class="kpi-label">Most Profitable Area</div><div class="kpi-value" style="font-size:18px">${bestArea ? bestArea[0] : '—'}</div><div class="kpi-sub">${bestArea ? fmt(bestArea[1].net) + ' net' : ''}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Highest Avg Delivery Cost</div><div class="kpi-value" style="font-size:18px">${highestAvgDel ? highestAvgDel[0] : '—'}</div><div class="kpi-sub">${highestAvgDel ? fmt(highestAvgDel[1].delivery / highestAvgDel[1].count) + ' avg' : ''}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Delivery Spend</div><div class="kpi-value">${fmt(invoices.reduce((s,i) => s + (i.delivery||0), 0))}</div><div class="kpi-sub">across all areas</div></div>
+  `;
+
+  const tbody = document.getElementById('areasBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><p>No delivery address data yet. Make sure invoices have shipping addresses.</p></div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(([city, d], ri) => {
+    const gp      = d.sales > 0 ? d.gross    / d.sales : 0;
+    const np      = d.sales > 0 ? d.net      / d.sales : 0;
+    const avgDel  = d.count > 0 ? d.delivery / d.count : 0;
+    return `<tr>
+      <td><span class="rank-pill">${ri + 1}</span><strong>${city}</strong></td>
+      <td class="num">${d.count}</td>
+      <td class="num mono">${fmt(d.sales)}</td>
+      <td class="num mono" style="color:var(--profit)">${fmt(d.gross)}</td>
+      <td class="num mono">${pct(gp)}</td>
+      <td class="num mono" style="color:var(--accent)">${fmt(d.delivery)}</td>
+      <td class="num mono" style="color:var(--accent)">${fmt(avgDel)}</td>
+      <td class="num mono" style="color:${d.net >= 0 ? 'var(--profit)' : 'var(--loss)'};font-weight:600">${fmt(d.net)}</td>
+      <td class="num"><span class="badge ${d.net >= 0 ? 'badge-profit' : 'badge-loss'}">${pct(np)}</span></td>
+    </tr>`;
+  }).join('');
 }
