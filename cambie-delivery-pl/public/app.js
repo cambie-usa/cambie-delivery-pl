@@ -20,6 +20,7 @@ async function upsertInvoice(inv) {
   const row = {
     inv_no:        inv.invNo,
     customer:      inv.customer,
+    address:       inv.address || '',
     inv_date:      inv.date,
     invoice_total: inv.invoiceTotal,
     gross_profit:  inv.grossProfit,
@@ -38,7 +39,7 @@ async function upsertInvoice(inv) {
   return data;
 }
 
-async function deleteInvoice(invNo) {
+async function dbDeleteInvoice(invNo) {
   const { error } = await db
     .from('invoices')
     .delete()
@@ -53,6 +54,7 @@ function rowToInv(row) {
     id:           row.id,
     invNo:        row.inv_no,
     customer:     row.customer,
+    address:      row.address || '',
     date:         row.inv_date,
     invoiceTotal: parseFloat(row.invoice_total),
     grossProfit:  parseFloat(row.gross_profit),
