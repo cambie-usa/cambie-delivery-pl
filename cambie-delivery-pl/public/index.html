@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,16 +13,20 @@
 <body>
 
 <header class="site-header">
-  <div class="brand">cambie <span>Local Delivery P&L</span></div>
+  <div class="brand">
+    <img src="logo.jpg" alt="Cambie" class="brand-logo">
+    <span class="brand-divider"></span>
+    <span class="brand-subtitle">Local Delivery P&L</span>
+  </div>
   <div class="header-actions">
     <div class="sync-status" id="syncStatus">
       <span class="sync-dot" id="syncDot"></span>
       <span id="syncLabel">Connecting…</span>
     </div>
-    <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
+    <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">
       ＋ Add Invoice
     </button>
-    <button class="btn btn-secondary" onclick="generatePDF()">
+    <button class="btn btn-dark" onclick="generatePDF()">
       ↓ Export PDF
     </button>
   </div>
@@ -29,88 +34,171 @@
 
 <input type="file" id="fileInput" accept="application/pdf" multiple>
 
+<!-- TABS -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+  <button class="tab-btn" onclick="switchTab('customers')">Customers</button>
+  <button class="tab-btn" onclick="switchTab('areas')">Delivery Areas</button>
+</div>
+
 <div class="app">
 
-  <!-- KPI SUMMARY -->
-  <div class="kpi-grid">
-    <div class="kpi-card">
-      <div class="kpi-label">Total Sales</div>
-      <div class="kpi-value" id="kpiSales">—</div>
-      <div class="kpi-sub" id="kpiSalesCount">0 invoices</div>
+  <!-- ═══════════════════════════════════════════════ TAB: OVERVIEW -->
+  <div id="tab-overview" class="tab-panel">
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Sales</div>
+        <div class="kpi-value" id="kpiSales">—</div>
+        <div class="kpi-sub" id="kpiSalesCount">0 invoices</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Gross Profit</div>
+        <div class="kpi-value" id="kpiGross">—</div>
+        <div class="kpi-sub" id="kpiGrossPct">— margin</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Delivery Expense</div>
+        <div class="kpi-value" id="kpiDelivery">—</div>
+        <div class="kpi-sub" id="kpiDeliveryPct">— of sales</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Net Profit</div>
+        <div class="kpi-value" id="kpiNet">—</div>
+        <div class="kpi-sub" id="kpiNetPct">— margin</div>
+      </div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Gross Profit</div>
-      <div class="kpi-value" id="kpiGross">—</div>
-      <div class="kpi-sub" id="kpiGrossPct">— margin</div>
+
+    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+      <div class="upload-icon">📄</div>
+      <h3>Drop Cambie invoices here</h3>
+      <p>PDF invoices exported from CIN7 · Click to browse or drag and drop</p>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Delivery Expense</div>
-      <div class="kpi-value" id="kpiDelivery">—</div>
-      <div class="kpi-sub" id="kpiDeliveryPct">— of sales</div>
+
+    <div class="section-header">
+      <div class="section-title">All Invoices</div>
+      <div class="section-meta" id="lastRefreshed"></div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Net Profit</div>
-      <div class="kpi-value" id="kpiNet">—</div>
-      <div class="kpi-sub" id="kpiNetPct">— margin</div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Invoice</th>
+            <th>Customer</th>
+            <th>Date</th>
+            <th class="num">Sales</th>
+            <th class="num">Gross Profit</th>
+            <th class="num">GP %</th>
+            <th class="num">Delivery</th>
+            <th class="num">Net Profit</th>
+            <th class="num">Net %</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="invoicesBody">
+          <tr><td colspan="10"><div class="empty-state"><p>Loading…</p></div></td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
-  <!-- UPLOAD ZONE -->
-  <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-    <div class="upload-icon">📄</div>
-    <h3>Drop Cambie invoices here</h3>
-    <p>PDF invoices exported from CIN7 · Click to browse or drag and drop</p>
+  <!-- ═══════════════════════════════════════════ TAB: CUSTOMERS -->
+  <div id="tab-customers" class="tab-panel hidden">
+
+    <div class="search-bar">
+      <input type="text" id="customerSearch" placeholder="Search customers…" oninput="renderCustomerTab()" class="search-input">
+    </div>
+
+    <!-- Customer summary cards (shown when one is selected) -->
+    <div id="customerDetail" class="hidden">
+      <div class="detail-header">
+        <div>
+          <div class="detail-name" id="detailName"></div>
+          <div class="detail-address" id="detailAddress"></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="clearCustomerDetail()">← All Customers</button>
+      </div>
+      <div class="kpi-grid kpi-grid-sm" id="detailKPIs"></div>
+      <div class="section-header">
+        <div class="section-title">Invoice History</div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Invoice</th>
+              <th>Date</th>
+              <th class="num">Sales</th>
+              <th class="num">Gross Profit</th>
+              <th class="num">GP %</th>
+              <th class="num">Delivery</th>
+              <th class="num">Net Profit</th>
+              <th class="num">Net %</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="detailInvoices"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Customer list (shown by default) -->
+    <div id="customerList">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Last Delivery</th>
+              <th class="num">Invoices</th>
+              <th class="num">Total Sales</th>
+              <th class="num">Gross Profit</th>
+              <th class="num">GP %</th>
+              <th class="num">Delivery Cost</th>
+              <th class="num">Net Profit</th>
+              <th class="num">Net %</th>
+            </tr>
+          </thead>
+          <tbody id="customerBody">
+            <tr><td colspan="9"><div class="empty-state"><p>Loading…</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
-  <!-- INVOICES TABLE -->
-  <div class="section-header">
-    <div class="section-title">Invoices</div>
-    <div style="font-size:12px;color:var(--ink-muted)" id="lastRefreshed"></div>
-  </div>
-  <div class="table-wrap">
-    <table class="data-table" id="invoicesTable">
-      <thead>
-        <tr>
-          <th>Invoice</th>
-          <th>Customer</th>
-          <th>Date</th>
-          <th class="num">Sales</th>
-          <th class="num">Gross Profit</th>
-          <th class="num">GP %</th>
-          <th class="num">Delivery</th>
-          <th class="num">Net Profit</th>
-          <th class="num">Net %</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="invoicesBody">
-        <tr><td colspan="10"><div class="empty-state"><p>Loading…</p></div></td></tr>
-      </tbody>
-    </table>
-  </div>
+  <!-- ═══════════════════════════════════════════ TAB: AREAS -->
+  <div id="tab-areas" class="tab-panel hidden">
 
-  <!-- CUSTOMER TABLE -->
-  <div class="section-header" style="margin-top:32px">
-    <div class="section-title">P&L by Customer</div>
-  </div>
-  <div class="table-wrap">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Customer</th>
-          <th class="num">Invoices</th>
-          <th class="num">Sales</th>
-          <th class="num">Gross Profit</th>
-          <th class="num">GP %</th>
-          <th class="num">Delivery</th>
-          <th class="num">Net Profit</th>
-          <th class="num">Net %</th>
-        </tr>
-      </thead>
-      <tbody id="customerBody">
-        <tr><td colspan="8"><div class="empty-state"><p>Loading…</p></div></td></tr>
-      </tbody>
-    </table>
+    <div class="areas-intro">
+      <p>Delivery area performance is derived from the city in each invoice's shipping address. Use this to identify which parts of Dallas are most profitable to service.</p>
+    </div>
+
+    <div class="kpi-grid" id="areasKPIs" style="margin-bottom:24px"></div>
+
+    <div class="section-header">
+      <div class="section-title">By City / Area</div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>City / Area</th>
+            <th class="num">Deliveries</th>
+            <th class="num">Total Sales</th>
+            <th class="num">Gross Profit</th>
+            <th class="num">GP %</th>
+            <th class="num">Delivery Cost</th>
+            <th class="num">Avg Delivery</th>
+            <th class="num">Net Profit</th>
+            <th class="num">Net %</th>
+          </tr>
+        </thead>
+        <tbody id="areasBody">
+          <tr><td colspan="9"><div class="empty-state"><p>Loading…</p></div></td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
 </div>
