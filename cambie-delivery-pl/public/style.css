@@ -309,3 +309,73 @@ body {
   .brand-subtitle { font-size: 14px; }
   .brand-logo { height: 26px; }
 }
+
+/* â”€â”€ DATE FILTER BAR â”€â”€ */
+.filter-bar {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 20px; flex-wrap: wrap;
+}
+.filter-label { font-size: 12px; font-weight: 600; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.6px; white-space: nowrap; }
+.filter-pills { display: flex; gap: 4px; flex-wrap: wrap; }
+.pill {
+  padding: 5px 12px; border-radius: 100px;
+  font-size: 12px; font-weight: 500;
+  border: 1px solid var(--rule); background: #fff; color: var(--ink-muted);
+  cursor: pointer; transition: all 0.15s;
+}
+.pill:hover { border-color: var(--cambie-green); color: var(--cambie-green); }
+.pill.active { background: var(--cambie-green); color: #fff; border-color: var(--cambie-green); }
+.filter-count { font-size: 12px; color: var(--ink-muted); font-style: italic; }
+
+/* â”€â”€ COURIER MODAL ROW â”€â”€ */
+.courier-row {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+}
+.courier-select-wrap { flex: 1; min-width: 180px; }
+.courier-select {
+  width: 100%; padding: 8px 12px;
+  border: 1px solid #f0d8c8; border-radius: 4px;
+  font-family: var(--font-sans); font-size: 14px; font-weight: 500;
+  background: #fff; color: var(--ink); cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236b6b6b' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+  padding-right: 32px;
+}
+.courier-select:focus { outline: none; border-color: var(--accent); }
+
+/* â”€â”€ COURIER CARDS â”€â”€ */
+.courier-cards {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 16px; margin-bottom: 4px;
+}
+.courier-card {
+  background: #fff; border: 1px solid var(--rule); border-radius: 8px;
+  padding: 20px 24px; display: flex; flex-direction: column; gap: 12px;
+}
+.courier-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.courier-card-name { font-size: 16px; font-weight: 600; }
+.courier-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 100px;
+  font-size: 11px; font-weight: 600;
+}
+.courier-badge-dropoff { background: #e8f0fb; color: #2563eb; }
+.courier-badge-xpress  { background: #fdf0e8; color: var(--accent); }
+.courier-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.courier-stat-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--ink-muted); margin-bottom: 3px; }
+.courier-stat-value { font-family: var(--font-mono); font-size: 18px; font-weight: 600; }
+.courier-bar-wrap { background: var(--rule); height: 5px; border-radius: 3px; margin-top: 8px; overflow: hidden; }
+.courier-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+.bar-dropoff { background: #2563eb; }
+.bar-xpress  { background: var(--accent); }
+
+/* â”€â”€ COURIER TABLE BADGE â”€â”€ */
+.courier-pill {
+  display: inline-block; padding: 2px 8px; border-radius: 100px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.courier-pill-dropoff { background: #e8f0fb; color: #2563eb; }
+.courier-pill-xpress  { background: #fdf0e8; color: var(--accent); }
+.courier-pill-none    { background: var(--rule); color: var(--ink-muted); }
