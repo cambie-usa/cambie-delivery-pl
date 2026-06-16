@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cambie — Local Delivery P&L</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand">cambie <span>Local Delivery P&L</span></div>
+  <div class="header-actions">
+    <div class="sync-status" id="syncStatus">
+      <span class="sync-dot" id="syncDot"></span>
+      <span id="syncLabel">Connecting…</span>
+    </div>
+    <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
+      ＋ Add Invoice
+    </button>
+    <button class="btn btn-secondary" onclick="generatePDF()">
+      ↓ Export PDF
+    </button>
+  </div>
+</header>
+
+<input type="file" id="fileInput" accept="application/pdf" multiple>
+
+<div class="app">
+
+  <!-- KPI SUMMARY -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Sales</div>
+      <div class="kpi-value" id="kpiSales">—</div>
+      <div class="kpi-sub" id="kpiSalesCount">0 invoices</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Gross Profit</div>
+      <div class="kpi-value" id="kpiGross">—</div>
+      <div class="kpi-sub" id="kpiGrossPct">— margin</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Delivery Expense</div>
+      <div class="kpi-value" id="kpiDelivery">—</div>
+      <div class="kpi-sub" id="kpiDeliveryPct">— of sales</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Net Profit</div>
+      <div class="kpi-value" id="kpiNet">—</div>
+      <div class="kpi-sub" id="kpiNetPct">— margin</div>
+    </div>
+  </div>
+
+  <!-- UPLOAD ZONE -->
+  <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+    <div class="upload-icon">📄</div>
+    <h3>Drop Cambie invoices here</h3>
+    <p>PDF invoices exported from CIN7 · Click to browse or drag and drop</p>
+  </div>
+
+  <!-- INVOICES TABLE -->
+  <div class="section-header">
+    <div class="section-title">Invoices</div>
+    <div style="font-size:12px;color:var(--ink-muted)" id="lastRefreshed"></div>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table" id="invoicesTable">
+      <thead>
+        <tr>
+          <th>Invoice</th>
+          <th>Customer</th>
+          <th>Date</th>
+          <th class="num">Sales</th>
+          <th class="num">Gross Profit</th>
+          <th class="num">GP %</th>
+          <th class="num">Delivery</th>
+          <th class="num">Net Profit</th>
+          <th class="num">Net %</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="invoicesBody">
+        <tr><td colspan="10"><div class="empty-state"><p>Loading…</p></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- CUSTOMER TABLE -->
+  <div class="section-header" style="margin-top:32px">
+    <div class="section-title">P&L by Customer</div>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th class="num">Invoices</th>
+          <th class="num">Sales</th>
+          <th class="num">Gross Profit</th>
+          <th class="num">GP %</th>
+          <th class="num">Delivery</th>
+          <th class="num">Net Profit</th>
+          <th class="num">Net %</th>
+        </tr>
+      </thead>
+      <tbody id="customerBody">
+        <tr><td colspan="8"><div class="empty-state"><p>Loading…</p></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- INVOICE ENTRY MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h2 id="modalTitle">Invoice</h2>
+        <div class="modal-meta" id="modalMeta"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="inv-info" id="invInfo"></div>
+
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th class="num">Qty</th>
+            <th class="num">Unit Price</th>
+            <th class="num">Line Total</th>
+            <th class="num">Margin %</th>
+            <th class="num">Gross Profit</th>
+          </tr>
+        </thead>
+        <tbody id="itemsBody"></tbody>
+        <tfoot>
+          <tr class="tfoot-row">
+            <td colspan="3" class="tfoot-label">Invoice Total</td>
+            <td class="num mono" id="modalTotal"></td>
+            <td></td>
+            <td class="num mono profit" id="modalGross"></td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div class="delivery-section">
+        <label>Courier Delivery Charge</label>
+        <div class="delivery-input-row">
+          <span class="delivery-dollar">$</span>
+          <input type="number" class="delivery-input" id="deliveryInput"
+            min="0" step="0.01" placeholder="0.00" oninput="updateModalTotals()">
+          <span class="delivery-hint">Actual courier charge for this delivery</span>
+        </div>
+      </div>
+
+      <div class="summary-box">
+        <div class="summary-item">
+          <div class="summary-label green">Gross Profit</div>
+          <div class="summary-value profit" id="summaryGross">$0.00</div>
+          <div class="summary-pct" id="summaryGrossPct">0.0%</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label accent">Delivery Expense</div>
+          <div class="summary-value accent-text" id="summaryDelivery">$0.00</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label green">Net Profit</div>
+          <div class="summary-value" id="summaryNet">$0.00</div>
+          <div class="summary-pct" id="summaryNetPct">0.0%</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveInvoice()">Save Invoice</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script src="dashboard.js"></script>
+</body>
+</html>
