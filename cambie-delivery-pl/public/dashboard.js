@@ -142,22 +142,25 @@ function extractInvoiceData(text, filename) {
   const dateMatch = text.match(/Invoice Date\s*([\d\/]+)/i) || text.match(/(\d{2}\/\d{2}\/\d{4})/);
   const date = dateMatch ? dateMatch[1].trim() : new Date().toLocaleDateString();
 
+  // Strip commas from numbers like "1,485.00"
+  const n = s => parseFloat((s || '0').replace(/,/g, ''));
+
   const items = [];
-  const pat = /(\d{5,8})\s+([\w\s\-\/]+?)\s+Item\s+([\d.]+)\s+([\d.]+)\s+[\d.]+%\s+([\d.]+)/gi;
+  const pat = /(\d{5,8})\s+([\w\s\-\/]+?)\s+Item\s+([\d.,]+)\s+([\d.,]+)\s+[\d.,]+%\s+([\d.,]+)/gi;
   let m;
   while ((m = pat.exec(text)) !== null) {
-    const lineTotal = parseFloat(m[5]);
-    if (lineTotal > 0) items.push({ code: m[1], description: m[2].trim(), qty: parseFloat(m[3]), unitPrice: parseFloat(m[4]), lineTotal, margin: '' });
+    const lineTotal = n(m[5]);
+    if (lineTotal > 0) items.push({ code: m[1], description: m[2].trim(), qty: n(m[3]), unitPrice: n(m[4]), lineTotal, margin: '' });
   }
   if (items.length === 0) {
-    const pat2 = /(\d{5,8})\s+(.*?)\s+([\d.]+)\s+([\d.]+)\s+[\d.]+%\s+([\d.]+)\s+No/gi;
+    const pat2 = /(\d{5,8})\s+(.*?)\s+([\d.,]+)\s+([\d.,]+)\s+[\d.,]+%\s+([\d.,]+)\s+No/gi;
     while ((m = pat2.exec(text)) !== null) {
-      items.push({ code: m[1], description: m[2].trim(), qty: parseFloat(m[3]), unitPrice: parseFloat(m[4]), lineTotal: parseFloat(m[5]), margin: '' });
+      items.push({ code: m[1], description: m[2].trim(), qty: n(m[3]), unitPrice: n(m[4]), lineTotal: n(m[5]), margin: '' });
     }
   }
 
-  const totalMatch = text.match(/Total\s+([\d.]+)\s+Total\s+[\d.]+\s+Total\s+([\d.]+)/i);
-  const invoiceTotal = totalMatch ? parseFloat(totalMatch[2]) : items.reduce((s, i) => s + i.lineTotal, 0);
+  const totalMatch = text.match(/Total\s+([\d,]+\.?\d*)\s+Total\s+[\d,]+\.?\d*\s+Total\s+([\d,]+\.?\d*)/i);
+  const invoiceTotal = totalMatch ? n(totalMatch[2]) : items.reduce((s, i) => s + i.lineTotal, 0);
   if (!invoiceTotal) return null;
   if (items.length === 0) items.push({ code: '', description: 'Invoice Total', qty: 1, unitPrice: invoiceTotal, lineTotal: invoiceTotal, margin: '' });
 
