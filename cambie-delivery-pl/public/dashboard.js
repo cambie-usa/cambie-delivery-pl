@@ -145,21 +145,33 @@ function extractInvoiceData(text, filename) {
   // Strip commas from numbers like "1,485.00"
   const n = s => parseFloat((s || '0').replace(/,/g, ''));
 
+  // Collapse text so wrapped product descriptions (e.g. "CACAO BARRY BAKING STICKS 8 CM -\n1.6 KG") join into one line
+  const flat = text.replace(/\n/g, ' ').replace(/\s{2,}/g, ' ');
+
   const items = [];
-  const pat = /(\d{5,8})\s+([\w\s\-\/]+?)\s+Item\s+([\d.,]+)\s+([\d.,]+)\s+[\d.,]+%\s+([\d.,]+)/gi;
+  // Primary pattern: SKU ... Item qty price discount% lineTotal
+  const pat = /(\d{5,8})\s+([\w\s\-\/.,&']+?)\s+Item\s+([\d.,]+)\s+([\d.,]+)\s+[\d.,]+%\s+([\d.,]+)/gi;
   let m;
-  while ((m = pat.exec(text)) !== null) {
+  while ((m = pat.exec(flat)) !== null) {
     const lineTotal = n(m[5]);
-    if (lineTotal > 0) items.push({ code: m[1], description: m[2].trim(), qty: n(m[3]), unitPrice: n(m[4]), lineTotal, margin: '' });
+    const desc = m[2].trim();
+    // Skip if description looks like noise (too short or all numbers)
+    if (lineTotal > 0 && desc.length > 2 && isNaN(Number(desc))) {
+      items.push({ code: m[1], description: desc, qty: n(m[3]), unitPrice: n(m[4]), lineTotal, margin: '' });
+    }
   }
   if (items.length === 0) {
-    const pat2 = /(\d{5,8})\s+(.*?)\s+([\d.,]+)\s+([\d.,]+)\s+[\d.,]+%\s+([\d.,]+)\s+No/gi;
-    while ((m = pat2.exec(text)) !== null) {
-      items.push({ code: m[1], description: m[2].trim(), qty: n(m[3]), unitPrice: n(m[4]), lineTotal: n(m[5]), margin: '' });
+    const pat2 = /(\d{5,8})\s+([\w\s\-\/.,&']+?)\s+([\d.,]+)\s+([\d.,]+)\s+[\d.,]+%\s+([\d.,]+)\s+No/gi;
+    while ((m = pat2.exec(flat)) !== null) {
+      const lineTotal = n(m[5]);
+      const desc = m[2].trim();
+      if (lineTotal > 0 && desc.length > 2 && isNaN(Number(desc))) {
+        items.push({ code: m[1], description: desc, qty: n(m[3]), unitPrice: n(m[4]), lineTotal, margin: '' });
+      }
     }
   }
 
-  const totalMatch = text.match(/Total\s+([\d,]+\.?\d*)\s+Total\s+[\d,]+\.?\d*\s+Total\s+([\d,]+\.?\d*)/i);
+  const totalMatch = flat.match(/Total\s+([\d,]+\.?\d*)\s+Total\s+[\d,]+\.?\d*\s+Total\s+([\d,]+\.?\d*)/i);
   const invoiceTotal = totalMatch ? n(totalMatch[2]) : items.reduce((s, i) => s + i.lineTotal, 0);
   if (!invoiceTotal) return null;
   if (items.length === 0) items.push({ code: '', description: 'Invoice Total', qty: 1, unitPrice: invoiceTotal, lineTotal: invoiceTotal, margin: '' });
